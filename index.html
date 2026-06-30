@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chance Map – Libera International (Clustered)</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f0f6f6;
+    color: #003040;
+    display: flex;
+    flex-direction: column;
+  }
+
+  #controls {
+    background: #fff;
+    border-bottom: 1px solid #cce4e8;
+    padding: 10px 20px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    z-index: 999;
+    position: relative;
+  }
+
+  .layer-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 2px solid transparent;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: #f0f6f6;
+    color: #003040;
+  }
+
+  .layer-btn .dot {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+
+  .layer-btn.active {
+    border-color: currentColor;
+    background: #fff;
+  }
+
+  .layer-btn.members { color: #30a0d0; }
+  .layer-btn.places { color: #F5C842; }
+
+  #count {
+    margin-left: auto;
+    font-size: 12px;
+    color: #5a9aaa;
+  }
+
+  #map {
+    flex: 1;
+    width: 100%;
+    min-height: 0;
+  }
+
+  /* Custom popup styles */
+  .leaflet-popup-content-wrapper {
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(27,58,107,0.18);
+    padding: 0;
+    overflow: hidden;
+    max-width: 300px;
+  }
+
+  .leaflet-popup-content {
+    margin: 0;
+    width: 280px !important;
+  }
+
+  .popup-inner {
+    padding: 16px;
+  }
+
+  .popup-type {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .popup-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: #003040;
+    margin-bottom: 6px;
+    line-height: 1.3;
+  }
+
+  .popup-location {
+    font-size: 12px;
+    color: #5a9aaa;
+    margin-bottom: 8px;
+  }
+
+  .popup-desc {
+    font-size: 12px;
+    color: #334;
+    line-height: 1.6;
+    margin-bottom: 12px;
+  }
+
+  .popup-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 12px;
+  }
+
+  .popup-tag {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: #e0f2f4;
+    color: #30a0d0;
+    font-weight: 500;
+  }
+
+  .popup-links {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .popup-link {
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 500;
+    transition: opacity 0.15s;
+  }
+
+  .popup-link:hover { opacity: 0.8; }
+
+  .popup-link.primary {
+    background: #30a0d0;
+    color: #fff;
+  }
+
+  .popup-link.secondary {
+    background: #f0f6f6;
+    color: #30a0d0;
+    border: 1px solid #9dd0d8;
+  }
+
+  /* Victim popup accent */
+  .popup-inner.place .popup-type { color: #F5C842; }
+  .popup-inner.place .popup-link.primary { background: #F5C842; }
+  .popup-inner.place .popup-tag { background: #fdf3cc; color: #F5C842; }
+
+  /* Partner popup accent */
+  .popup-inner.member .popup-type { color: #30a0d0; }
+
+  /* Date chip for victims */
+  .popup-date {
+    display: inline-block;
+    background: #fdf3cc;
+    color: #F5C842;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-bottom: 8px;
+  }
+
+  .leaflet-popup-tip { background: #fff; }
+</style>
+</head>
+<body>
+
+<div id="controls">
+  <button class="layer-btn members active" onclick="toggleLayer('members', this)">
+    <svg class="dot" width="18" height="18" viewBox="0 0 26 26" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="13" cy="13" r="11" fill="#fff" stroke="#30a0d0" stroke-width="3"/>
+      <circle cx="13" cy="13" r="5" fill="#30a0d0"/>
+    </svg> Members &amp; Partners
+  </button>
+  <button class="layer-btn places active" onclick="toggleLayer('places', this)">
+    <svg class="dot" width="18" height="18" viewBox="0 0 26 26" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="13" cy="13" r="11" fill="#fff" stroke="#F5C842" stroke-width="3"/>
+      <circle cx="13" cy="13" r="5" fill="#F5C842"/>
+    </svg> Places of Memory
+  </button>
+  <span id="count"></span>
+</div>
+
+<div id="map"></div>
+
+<script>
+const SHEET_ID = '1T9VE6DI8wVlNvIlRCFL3AqTOsfoZl9g6PBbAFJWPU8U';
+const GID_PARTNERS = '1541002771';
+const GID_VICTIMS = '902054875';
+
+const map = L.map('map', {
+  center: [48.5, 12],
+  zoom: 4,
+  zoomControl: true,
+  attributionControl: true
+});
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://openstreetmap.org/">OpenStreetMap</a>',
+  subdomains: 'abcd',
+  maxZoom: 18
+}).addTo(map);
+
+// --- CSV helpers ---
+
+function csvUrl(gid) {
+  const direct = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}`;
+  // On file:// protocol, fetch is blocked by CORS — use a proxy
+  if (location.protocol === 'file:') {
+    return `https://corsproxy.io/?url=${encodeURIComponent(direct)}`;
+  }
+  return direct;
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split(/\r?\n/);
+  const headers = splitCSVLine(lines[0]);
+  return lines.slice(1).filter(l => l.trim()).map(line => {
+    const cols = splitCSVLine(line);
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = (cols[i] || '').trim());
+    return obj;
+  });
+}
+
+function splitCSVLine(line) {
+  const cols = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { inQ = !inQ; }
+    else if (c === ',' && !inQ) { cols.push(cur); cur = ''; }
+    else cur += c;
+  }
+  cols.push(cur);
+  return cols.map(s => s.replace(/^"|"$/g, ''));
+}
+
+// --- Marker icons ---
+
+function partnerIcon() {
+  return L.divIcon({
+    className: '',
+    html: `<svg width="26" height="26" viewBox="0 0 26 26" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="13" cy="13" r="11" fill="#fff" stroke="#30a0d0" stroke-width="3"/>
+      <circle cx="13" cy="13" r="5" fill="#30a0d0"/>
+    </svg>`,
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+    popupAnchor: [0, -14]
+  });
+}
+
+function victimIcon() {
+  return L.divIcon({
+    className: '',
+    html: `<svg width="26" height="26" viewBox="0 0 26 26" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="13" cy="13" r="11" fill="#fff" stroke="#F5C842" stroke-width="3"/>
+      <circle cx="13" cy="13" r="5" fill="#F5C842"/>
+    </svg>`,
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+    popupAnchor: [0, -14]
+  });
+}
+
+function jitter(val) { return val + (Math.random() - 0.5) * 0.04; }
+
+function formatDate(d) {
+  if (!d) return '';
+  const [y, m, day] = d.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  if (m === '01' && day === '01') return y;
+  return `${parseInt(day)} ${months[parseInt(m)-1]} ${y}`;
+}
+
+// --- Cluster layers ---
+
+const clusterOpts = (color, textColor) => ({
+  maxClusterRadius: 50,
+  iconCreateFunction(cluster) {
+    const count = cluster.getChildCount();
+    const size = count < 10 ? 34 : count < 50 ? 40 : 46;
+    return L.divIcon({
+      className: '',
+      html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif;font-size:13px;font-weight:700;color:${textColor};line-height:1;">${count}</div>`,
+      iconSize: [size, size],
+      iconAnchor: [size/2, size/2]
+    });
+  }
+});
+
+const partnerLayer = L.markerClusterGroup(clusterOpts('#30a0d0', '#000'));
+const victimLayer  = L.markerClusterGroup(clusterOpts('#F5C842', '#000'));
+const layers = { members: partnerLayer, places: victimLayer };
+
+let partnerCount = 0, victimCount = 0;
+
+function addPartnerMarker(p) {
+  const lat = parseFloat(p.lat), lon = parseFloat(p.lon);
+  if (isNaN(lat) || isNaN(lon)) return;
+  const tags = (p.ambito || '').split(',').slice(0,3).map(t => t.trim());
+  const tagHtml = tags.map(t => `<span class="popup-tag">${t}</span>`).join('');
+  const igLink = p.instagram ? `<a class="popup-link secondary" href="${p.instagram}" target="_blank">Instagram</a>` : '';
+  const webLink = p.website ? `<a class="popup-link primary" href="${p.website}" target="_blank">Website</a>` : '';
+  const popup = `<div class="popup-inner member">
+    <div class="popup-type">${p.type || ''} · ${p.country || ''}</div>
+    <div class="popup-name">${p.name || ''}</div>
+    <div class="popup-location">${p.city || ''}</div>
+    <div class="popup-tags">${tagHtml}</div>
+    <div class="popup-links">${webLink}${igLink}</div>
+  </div>`;
+  L.marker([jitter(lat), jitter(lon)], {icon: partnerIcon()})
+    .bindPopup(popup, {maxWidth: 300})
+    .addTo(partnerLayer);
+  partnerCount++;
+}
+
+function addVictimMarker(v) {
+  const lat = parseFloat(v.lat), lon = parseFloat(v.lon);
+  if (isNaN(lat) || isNaN(lon)) return;
+  const fullName = `${v.first_name || ''} ${v.last_name || ''}`.trim();
+  const webLink = v.link_approfondimento ? `<a class="popup-link primary" href="${v.link_approfondimento}" target="_blank">Learn more</a>` : '';
+  const popup = `<div class="popup-inner place">
+    <div class="popup-type">Place of Memory</div>
+    <div class="popup-name">${fullName}</div>
+    <div class="popup-location">${v.location || ''}</div>
+    <span class="popup-date">${formatDate(v.date)}</span>
+    <div class="popup-desc">${v.description || ''}</div>
+    <div class="popup-links">${webLink}</div>
+  </div>`;
+  L.marker([jitter(lat), jitter(lon)], {icon: victimIcon()})
+    .bindPopup(popup, {maxWidth: 300})
+    .addTo(victimLayer);
+  victimCount++;
+}
+
+// --- Layer toggle ---
+
+function toggleLayer(name, btn) {
+  btn.classList.toggle('active');
+  if (map.hasLayer(layers[name])) {
+    map.removeLayer(layers[name]);
+  } else {
+    layers[name].addTo(map);
+  }
+  updateCount();
+}
+
+function updateCount() {
+  const pc = map.hasLayer(partnerLayer) ? partnerCount : 0;
+  const vc = map.hasLayer(victimLayer) ? victimCount : 0;
+  const parts = [];
+  if (pc) parts.push(`${pc} members & partners`);
+  if (vc) parts.push(`${vc} places of memory`);
+  document.getElementById('count').textContent = parts.join(' · ');
+}
+
+// --- Load data from Google Sheets ---
+
+document.getElementById('count').textContent = 'Loading…';
+
+Promise.all([
+  fetch(csvUrl(GID_PARTNERS)).then(r => r.text()),
+  fetch(csvUrl(GID_VICTIMS)).then(r => r.text())
+]).then(([partnersCSV, victimsCSV]) => {
+  const partners = parseCSV(partnersCSV);
+  const victims  = parseCSV(victimsCSV);
+  partners.forEach(addPartnerMarker);
+  victims.forEach(addVictimMarker);
+  partnerLayer.addTo(map);
+  victimLayer.addTo(map);
+  updateCount();
+}).catch(err => {
+  console.error('Failed to load sheet data:', err);
+  document.getElementById('count').textContent = 'Error loading data';
+});
+</script>
+</body>
+</html>
